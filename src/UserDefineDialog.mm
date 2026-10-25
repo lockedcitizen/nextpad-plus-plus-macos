@@ -1,7 +1,6 @@
 #import "UserDefineDialog.h"
 #import "UDLStylerDialog.h"
 #import "NppLocalizer.h"
-#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Flipped view: origin at top-left (like Windows), needed for scroll content.
@@ -1432,14 +1431,17 @@ static BOOL isBundledUDLPath(NSString *p) {
 }
 - (void)_import:(id)s {
     if (![self _commitEdits]) return;   // keep the unsaved edits in the form
-    NSOpenPanel *p=[NSOpenPanel openPanel]; p.allowedContentTypes=@[[UTType typeWithFilenameExtension:@"xml"]];
+    NSOpenPanel *p = [NSOpenPanel openPanel];
+    p.allowedFileTypes = @[@"xml"];
     if([p runModal]!=NSModalResponseOK)return;
     UserDefinedLang *u=[[UserDefineLangManager shared]importFromPath:p.URL.path];
     if(u){NSString *nm=u.name; [self _reloadAndNotify:nm oldName:nil]; [self _rebuildPopup];[_langPopup selectItemWithTitle:nm];[self _load];}
 }
 - (void)_export:(id)s {
     // Export copies the file on disk, so save pending edits into it first.
-    if(!_cur||![self _commitEdits])return; NSSavePanel *p=[NSSavePanel savePanel]; p.allowedContentTypes=@[[UTType typeWithFilenameExtension:@"xml"]];
+    if (!_cur || ![self _commitEdits]) return;
+    NSSavePanel *p = [NSSavePanel savePanel];
+    p.allowedFileTypes = @[@"xml"];
     p.nameFieldStringValue=[NSString stringWithFormat:@"%@.udl.xml",_cur.name];
     if([p runModal]==NSModalResponseOK)[[UserDefineLangManager shared]exportLanguage:_cur toPath:p.URL.path];
 }
