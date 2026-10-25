@@ -483,9 +483,7 @@ target_link_libraries(NotepadPlusPlusMac PRIVATE
     scintilla
     lexilla
     "-framework Cocoa"
-    "-framework QuartzCore"
-    "-framework UniformTypeIdentifiers"
-)
+    "-framework QuartzCore")
 
 set_source_files_properties(${APP_SRCS} PROPERTIES
     COMPILE_FLAGS "-fobjc-arc"
