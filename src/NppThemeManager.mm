@@ -402,10 +402,6 @@ static NSString *_toolbarIconDirForDark(BOOL dark) {
     return rgb ? rgb.brightnessComponent < 0.5 : NO;
 }
 
-+ (NSAppearance *)appearanceForBackground:(NSColor *)color {
-    return [NSAppearance appearanceNamed:
-        [self isDarkColor:color] ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
-}
 
 - (nullable NSImage *)tabbarIconNamed:(NSString *)name {
     NSString *path = [[NSBundle mainBundle] pathForResource:name ofType:@"png"
