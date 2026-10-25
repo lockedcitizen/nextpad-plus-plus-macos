@@ -1,0 +1,81 @@
+name: Big Sur compatibility build
+
+on:
+  push:
+    branches:
+      - codex/big-sur-compatibility
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build universal app (minimum macOS 11)
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Check Big Sur compatibility guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n -E 'allowedContentTypes|UniformTypeIdentifiers' src CMakeLists.txt; then
+            echo "A known Monterey-era file-panel API/framework reference remains." >&2
+            exit 1
+          fi
+          minimum="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' resources/Info.plist)"
+          test "$minimum" = "11.0"
+          echo "Declared minimum macOS version: $minimum"
+
+      - name: Report build tools
+        run: |
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+          cmake --version
+
+      - name: Configure universal build
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
+
+      - name: Compile
+        run: cmake --build build --parallel 3
+
+      - name: Verify app bundle and minimum OS
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/Nextpad++.app"
+          if [[ ! -d "$APP" ]]; then
+            APP="$(find build -maxdepth 5 -type d -name 'Nextpad++.app' -print -quit)"
+          fi
+          test -n "$APP"
+          test -d "$APP"
+          test -x "$APP/Contents/MacOS/Nextpad++"
+          minimum="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist")"
+          test "$minimum" = "11.0"
+          architectures="$(lipo -archs "$APP/Contents/MacOS/Nextpad++")"
+          echo "Architectures: $architectures"
+          [[ " $architectures " == *" arm64 "* ]]
+          [[ " $architectures " == *" x86_64 "* ]]
+          build_info="$(xcrun vtool -show-build "$APP/Contents/MacOS/Nextpad++")"
+          printf '%s\n' "$build_info"
+          grep -Eq 'minos 11\.0([[:space:]]|$)' <<< "$build_info"
+          codesign --verify --deep --strict "$APP"
+
+      - name: Package universal app
+        run: ditto -c -k --sequesterRsrc --keepParent "build/Nextpad++.app" "$RUNNER_TEMP/NextpadPlusPlus-BigSur-Universal.zip"
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NextpadPlusPlus-BigSur-Universal
+          path: ${{ runner.temp }}/NextpadPlusPlus-BigSur-Universal.zip
+          if-no-files-found: error
+          retention-days: 14
