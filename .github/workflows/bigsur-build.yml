@@ -1,0 +1,58 @@
+name: Big Sur compatibility build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/big-sur-compatibility
+
+permissions:
+  contents: read
+
+jobs:
+  build-intel:
+    # A modern macOS runner can compile binaries whose minimum OS is macOS 11.
+    # This checks compilation/linking; it cannot replace runtime testing on Big Sur.
+    runs-on: macos-15
+    steps:
+      - name: Check out compatibility branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/big-sur-compatibility
+
+      - name: Install CMake
+        run: brew install cmake
+
+      - name: Configure Intel build for macOS 11
+        run: |
+          cmake -S . -B build-bigsur \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64
+
+      - name: Build
+        run: cmake --build build-bigsur --parallel 3
+
+      - name: Locate app and inspect binary
+        id: inspect
+        shell: bash
+        run: |
+          APP="$(find build-bigsur -type d -name 'Nextpad++.app' -print -quit)"
+          test -n "$APP"
+          EXE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")
+          BIN="$APP/Contents/MacOS/$EXE"
+          file "$BIN"
+          otool -l "$BIN" | grep -A5 -E 'LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX' || true
+          otool -L "$BIN"
+          echo "app_path=$APP" >> "$GITHUB_OUTPUT"
+
+      - name: Package app bundle
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "${{ steps.inspect.outputs.app_path }}" Nextpad-BigSur-x86_64.zip
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nextpad-BigSur-x86_64-UNTESTED
+          path: Nextpad-BigSur-x86_64.zip
+          if-no-files-found: error
